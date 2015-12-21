@@ -1,9 +1,11 @@
 import theanets
 from scipy import ndimage
 from scipy import misc
-import sys
+from sklearn import tree
 import numpy
-
+import math
+import pickle
+import datetime
 
 class BottiImg(object):
     def __init__(self):
@@ -51,6 +53,7 @@ class BottiImg(object):
             self._img = ndimage.imread(filename, flatten=True)
         else:
             self._img = ndimage.imread(filename, mode='RGB')
+            print self._img.mean()
         misc.imsave('img/mario_out.png', self._img)
         if len(self._img.shape) == 3:
             (r, c, z) = self._img.shape
@@ -70,12 +73,129 @@ class BottiImg(object):
                 self._x[arr_row, 1] = ci
                 for zi in xrange(z):
                     self._y[arr_row, zi] = self._img[ri, ci, zi]
+                arr_row += 1
+        temp = numpy.hstack((self._x, self._y))
+        numpy.random.shuffle(temp)
+        self._x = temp[:, :2]
+        self._y = temp[:, 2:]
+
+
+def clip(x, lower=0, upper=255):
+    if x < lower:
+        return 0
+    elif x > upper:
+        return upper
+    return x
+
+
+def generate_circles(n=400):
+    img = numpy.zeros((n, n, 3), dtype=numpy.uint8)
+    for r in xrange(n):
+        for c in xrange(n):
+            dist_origin = math.sqrt(r*r + c*c)
+            dist_opposite = math.sqrt((n - r)*(n - r) + (n - c)*(n - c))
+            dist_upper = math.sqrt((n - r)*(n - r) + c*c)
+            raw_red = int(455*(n - dist_origin)/n)
+            raw_blue = int(455*(n - dist_opposite)/n)
+            raw_green = int(455*(n - dist_upper)/n)
+            img[r, c, 0] = clip(raw_red)
+            img[r, c, 1] = clip(raw_green)
+            img[r, c, 2] = clip(raw_blue)
+    misc.imsave("circles.png", img)
+
+
+def arrays_to_image(x, y, filename):
+    if x.shape[0] != y.shape[0]:
+        raise ValueError("Must have same number of rows in x as in y")
+
+    num_layers = y.shape[1]
+    if num_layers != 1 and num_layers != 3:
+        raise ValueError("Image must have one or three layers")
+
+    if x.shape[1] != 2:
+        raise ValueError("Argument x must have exactly 2 columns")
+    x_min = x.min(axis=0)
+    if x_min[0] < 0 or x_min[1] < 0:
+        raise ValueError("All values in x must be non negative")
+
+    x_max = x.max(axis=0)
+    r = int(x_max[0]) + 1
+    c = int(x_max[1]) + 1
+    if num_layers == 1:
+        img = y.mean()*numpy.ones((r, c))
+        for i in xrange(x.shape[0]):
+            ri = int(x[i, 0])
+            ci = int(x[i, 1])
+            img[ri, ci] = y[i][0]
+    else:
+        img = numpy.zeros((r, c, num_layers), dtype=numpy.uint8)
+        y_mean = y.mean(axis=0)
+        img[:, :, 0] = y_mean[0]
+        img[:, :, 1] = y_mean[1]
+        img[:, :, 2] = y_mean[2]
+        for i in xrange(x.shape[0]):
+            ri = int(x[i, 0])
+            ci = int(x[i, 1])
+            img[ri, ci, 0] = clip(int(y[i, 0]))
+            img[ri, ci, 1] = clip(int(y[i, 1]))
+            img[ri, ci, 2] = clip(int(y[i, 2]))
+    misc.imsave(filename, img)
+
+
+def modelize_image(img, layers, name):
+    num_output_nodes = img._y.shape[1]
+    all_layers = [2,] + layers + [num_output_nodes,]
+    net = theanets.Regressor(all_layers)
+    net.train(train=[img._x, img._y])
+    print "Trained", layers
+    pred = net.predict(img._x)
+    fullname = "results/"+name+"_net_"+("_".join([str(k) for k in layers]))
+    arrays_to_image(img._x, pred, fullname+".bmp")
+    arrays_to_image(img._x, pred, fullname+"_lossy.png")
+    net.save(fullname+".pkl.gz")
+
+
+def decision_tree_image(img, depth):
+    red_t = tree.DecisionTreeRegressor(max_depth=depth)
+    blue_t = tree.DecisionTreeRegressor(max_depth=depth)
+    green_t = tree.DecisionTreeRegressor(max_depth=depth)
+    red_t.fit(img._x, img._y[:, 0])
+    blue_t.fit(img._x, img._y[:, 1])
+    green_t.fit(img._x, img._y[:, 2])
+    red_pred = red_t.predict(img._x)
+    blue_pred = blue_t.predict(img._x)
+    green_pred = green_t.predict(img._x)
+    pred = numpy.zeros(img._y.shape)
+    pred[:, 0] = red_pred
+    pred[:, 1] = blue_pred
+    pred[:, 2] = green_pred
+    arrays_to_image(img._x, pred, "results/couple_tree_"+str(depth)+".bmp")
+    with open("couple_tree_"+str(depth)+".pkl", 'wb') as outfile:
+        pickle.dump((red_t, blue_t, green_t), outfile)
 
 
 def main():
     img = BottiImg()
-    img.load_image("img/mario.png")
-    print img.is_valid
+    #pic = "circles"
+    pic = "couple"
+    #img.load_image("img/inception.jpg")
+    img.load_image("img/"+pic+".png")
+
+    print img._y.mean(axis=0)
+    print img._y.min(axis=0)
+    print img._y.max(axis=0)
+
+    last = datetime.datetime.now()
+
+    #layer_sets = [[200, 100, 50, 25], [300, 50], [20, 20, 20, 20], [500,], [500, 100]]
+    layer_sets = [[200, 200, 100, 100]]
+    for lay in layer_sets:
+        modelize_image(img, lay, pic)
+        x = datetime.datetime.now()
+        print x - last
+        last = x
+    #for depth in (2, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 32):
+    #    decision_tree_image(img, depth)
 
 
 if __name__ == "__main__":
