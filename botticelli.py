@@ -1,4 +1,3 @@
-import theanets
 from scipy import ndimage
 from scipy import misc
 from sklearn import tree
@@ -6,6 +5,7 @@ import numpy
 import math
 import pickle
 import datetime
+
 
 class BottiImg(object):
     def __init__(self):
@@ -142,19 +142,7 @@ def arrays_to_image(x, y, filename):
     misc.imsave(filename, img)
 
 
-def modelize_image(img, layers, name):
-    num_output_nodes = img._y.shape[1]
-    all_layers = [2,] + layers + [num_output_nodes,]
-    net = theanets.Regressor(all_layers)
-    net.train(train=[img._x, img._y])
-    print "Trained", layers
-    pred = net.predict(img._x)
-    fullname = "results/"+name+"_net_"+("_".join([str(k) for k in layers]))
-    arrays_to_image(img._x, pred, fullname+".bmp")
-    arrays_to_image(img._x, pred, fullname+"_lossy.png")
-    net.save(fullname+".pkl.gz")
-
-
+# TODO: Move to new file
 def decision_tree_image(img, depth):
     red_t = tree.DecisionTreeRegressor(max_depth=depth)
     blue_t = tree.DecisionTreeRegressor(max_depth=depth)
@@ -176,26 +164,13 @@ def decision_tree_image(img, depth):
 
 def main():
     img = BottiImg()
-    #pic = "circles"
+    # TODO: Make this a command line flag
     pic = "couple"
-    #img.load_image("img/inception.jpg")
     img.load_image("img/"+pic+".png")
 
-    print img._y.mean(axis=0)
-    print img._y.min(axis=0)
-    print img._y.max(axis=0)
-
     last = datetime.datetime.now()
-
-    #layer_sets = [[200, 100, 50, 25], [300, 50], [20, 20, 20, 20], [500,], [500, 100]]
-    layer_sets = [[200, 200, 100, 100]]
-    for lay in layer_sets:
-        modelize_image(img, lay, pic)
-        x = datetime.datetime.now()
-        print x - last
-        last = x
-    #for depth in (2, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 32):
-    #    decision_tree_image(img, depth)
+    for depth in (2, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 32):
+        decision_tree_image(img, depth)
 
 
 if __name__ == "__main__":
