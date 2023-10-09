@@ -1,11 +1,11 @@
-from scipy import ndimage
-from scipy import misc
-from sklearn import tree
-import numpy
-import math
-import pickle
 import datetime
+import math
+import numpy
+import pickle
 
+import imageio.v3 as iio
+
+from sklearn import tree
 
 class BottiImg(object):
     def __init__(self):
@@ -19,7 +19,7 @@ class BottiImg(object):
     def is_valid(self):
         if self._img is None or self._rows is None or self._cols is None \
           or self._x is None or self._y is None:
-            print 'theres a none'
+            print('theres a none')
             return False
         if len(self._img.shape) == 3:
             (ir, ic, iz) = self._img.shape
@@ -27,34 +27,35 @@ class BottiImg(object):
             (ir, ic) = self._img.shape
             iz = 1
         if ir != self._rows or ic != self._cols:
-            print 'ir or ic'
+            print('ir or ic')
             return False
         (xm, xn) = self._x.shape
         (ym, yn) = self._y.shape
         if xm != ym:
-            print 'xm != ym'
+            print('xm != ym')
             return False
         if xm != self._rows*self._cols:
-            print 'xm rows * cols'
+            print('xm rows * cols')
             return False
         if xn != 2:
-            print 'xn != 2', xn
+            print('xn != 2', xn)
             return False
         if yn != 3 and yn != 1:
-            print 'yn = ', yn
+            print('yn = ', yn)
             return False
         if yn != iz:
-            print 'yn iz', yn, iz
+            print('yn iz', yn, iz)
             return False
         return True
 
     def load_image(self, filename, monochrome=False):
         if monochrome:
-            self._img = ndimage.imread(filename, flatten=True)
+            self._img = iio.imread(filename, flatten=True)
         else:
-            self._img = ndimage.imread(filename, mode='RGB')
-            print self._img.mean()
-        misc.imsave('img/mario_out.png', self._img)
+            self._img = iio.imread(filename, mode='RGB')
+            print(self._img.mean())
+        # TODO: wtf
+        iio.imwrite('img/mario_out.png', self._img, extension='.png')
         if len(self._img.shape) == 3:
             (r, c, z) = self._img.shape
         else:
@@ -64,14 +65,14 @@ class BottiImg(object):
         self._cols = c
         self._x = numpy.zeros((r*c, 2))
         self._y = numpy.zeros((r*c, z))
-        print '_x.shape', self._x.shape
-        print '_y.shape', self._y.shape
+        print('_x.shape', self._x.shape)
+        print('_y.shape', self._y.shape)
         arr_row = 0
-        for ri in xrange(r):
-            for ci in xrange(c):
+        for ri in range(r):
+            for ci in range(c):
                 self._x[arr_row, 0] = ri
                 self._x[arr_row, 1] = ci
-                for zi in xrange(z):
+                for zi in range(z):
                     self._y[arr_row, zi] = self._img[ri, ci, zi]
                 arr_row += 1
         temp = numpy.hstack((self._x, self._y))
@@ -90,8 +91,8 @@ def clip(x, lower=0, upper=255):
 
 def generate_circles(n=400):
     img = numpy.zeros((n, n, 3), dtype=numpy.uint8)
-    for r in xrange(n):
-        for c in xrange(n):
+    for r in range(n):
+        for c in range(n):
             dist_origin = math.sqrt(r*r + c*c)
             dist_opposite = math.sqrt((n - r)*(n - r) + (n - c)*(n - c))
             dist_upper = math.sqrt((n - r)*(n - r) + c*c)
@@ -101,7 +102,7 @@ def generate_circles(n=400):
             img[r, c, 0] = clip(raw_red)
             img[r, c, 1] = clip(raw_green)
             img[r, c, 2] = clip(raw_blue)
-    misc.imsave("circles.png", img)
+    iio.imwrite("circles.png", img, extension='.png')
 
 
 def arrays_to_image(x, y, filename):
@@ -123,7 +124,7 @@ def arrays_to_image(x, y, filename):
     c = int(x_max[1]) + 1
     if num_layers == 1:
         img = y.mean()*numpy.ones((r, c))
-        for i in xrange(x.shape[0]):
+        for i in range(x.shape[0]):
             ri = int(x[i, 0])
             ci = int(x[i, 1])
             img[ri, ci] = y[i][0]
@@ -133,13 +134,13 @@ def arrays_to_image(x, y, filename):
         img[:, :, 0] = y_mean[0]
         img[:, :, 1] = y_mean[1]
         img[:, :, 2] = y_mean[2]
-        for i in xrange(x.shape[0]):
+        for i in range(x.shape[0]):
             ri = int(x[i, 0])
             ci = int(x[i, 1])
             img[ri, ci, 0] = clip(int(y[i, 0]))
             img[ri, ci, 1] = clip(int(y[i, 1]))
             img[ri, ci, 2] = clip(int(y[i, 2]))
-    misc.imsave(filename, img)
+    iio.imwrite(filename, img)
 
 
 # TODO: Move to new file
@@ -169,7 +170,7 @@ def main():
     img.load_image("img/"+pic+".png")
 
     last = datetime.datetime.now()
-    for depth in (2, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 32):
+    for depth in (2, 4, 8, 12, 16):
         decision_tree_image(img, depth)
 
 

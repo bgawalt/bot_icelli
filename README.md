@@ -32,6 +32,15 @@ ML models are function approximators, "glorified curve fitting" in Judea Pearl's
 words.  So let's fit a weird curve that *mostly* follows your specific image's
 `(row, col) -> (R, G, B)` function.
 
+## Usage
+
+First, set up your Python environment with the two dependencies:
+
+```
+$ pip install imageio
+$ pip install -U scikit-learn
+```
+
 ## Roadmap
 
 This is destined to become a Bluesky bot who applies familiar models --
